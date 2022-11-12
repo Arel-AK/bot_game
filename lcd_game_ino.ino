@@ -1,48 +1,52 @@
-#include <LiquidCrystal.h>
+#include <LiquidCrystal_I2C.h>
 
+// this section defines the default conditions of the game environment
+volatile int grasw;
+volatile int napis;
+volatile int podmenu;
 #define PIN_BUTTON 2
 #define PIN_AUTOPLAY 1
 #define PIN_READWRITE 10
 #define PIN_CONTRAST 12
-
 #define SPRITE_RUN1 1
 #define SPRITE_RUN2 2
 #define SPRITE_JUMP 3
-#define SPRITE_JUMP_UPPER '.'         // Use the '.' character for the head
+#define SPRITE_JUMP_UPPER '.'         
 #define SPRITE_JUMP_LOWER 4
-#define SPRITE_TERRAIN_EMPTY ' '      // User the ' ' character
+#define SPRITE_TERRAIN_EMPTY ' '      
 #define SPRITE_TERRAIN_SOLID 5
 #define SPRITE_TERRAIN_SOLID_RIGHT 6
 #define SPRITE_TERRAIN_SOLID_LEFT 7
-
-#define HERO_HORIZONTAL_POSITION 1    // Horizontal position of hero on screen
-
+#define HERO_HORIZONTAL_POSITION 1    
 #define TERRAIN_WIDTH 16
 #define TERRAIN_EMPTY 0
 #define TERRAIN_LOWER_BLOCK 1
 #define TERRAIN_UPPER_BLOCK 2
+#define HERO_POSITION_OFF 0          
+#define HERO_POSITION_RUN_LOWER_1 1  
+#define HERO_POSITION_RUN_LOWER_2 2  
+#define HERO_POSITION_JUMP_1 3       
+#define HERO_POSITION_JUMP_2 4       
+#define HERO_POSITION_JUMP_3 5       
+#define HERO_POSITION_JUMP_4 6     
+#define HERO_POSITION_JUMP_5 7    
+#define HERO_POSITION_JUMP_6 8       
+#define HERO_POSITION_JUMP_7 9       
+#define HERO_POSITION_JUMP_8 10      
+#define HERO_POSITION_RUN_UPPER_1 11 
+#define HERO_POSITION_RUN_UPPER_2 12 
 
-#define HERO_POSITION_OFF 0          // Hero is invisible
-#define HERO_POSITION_RUN_LOWER_1 1  // Hero is running on lower row (pose 1)
-#define HERO_POSITION_RUN_LOWER_2 2  //                              (pose 2)
 
-#define HERO_POSITION_JUMP_1 3       // Starting a jump
-#define HERO_POSITION_JUMP_2 4       // Half-way up
-#define HERO_POSITION_JUMP_3 5       // Jump is on upper row
-#define HERO_POSITION_JUMP_4 6       // Jump is on upper row
-#define HERO_POSITION_JUMP_5 7       // Jump is on upper row
-#define HERO_POSITION_JUMP_6 8       // Jump is on upper row
-#define HERO_POSITION_JUMP_7 9       // Half-way down
-#define HERO_POSITION_JUMP_8 10      // About to land
 
-#define HERO_POSITION_RUN_UPPER_1 11 // Hero is running on upper row (pose 1)
-#define HERO_POSITION_RUN_UPPER_2 12 //                              (pose 2)
-
-LiquidCrystal lcd(11, 9, 6, 5, 4, 3);
+// includes the necessary library for the LCD model used
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 static char terrainUpper[TERRAIN_WIDTH + 1];
 static char terrainLower[TERRAIN_WIDTH + 1];
 static bool buttonPushed = false;
+char wybor;
+char wyborpoz;
 
+// gives the visual movement of the character
 void initializeGraphics(){
   static byte graphics[] = {
     // Run position 1
@@ -110,10 +114,10 @@ void initializeGraphics(){
     B11000,
   };
   int i;
-  // Skip using character 0, this allows lcd.print() to be used to
-  // quickly draw multiple characters
+  
+ // this section will give randomness to the terrain generation
   for (i = 0; i < 7; ++i) {
-	  lcd.createChar(i + 1, &graphics[i * 8]);
+    lcd.createChar(i + 1, &graphics[i * 8]);
   }
   for (i = 0; i < TERRAIN_WIDTH; ++i) {
     terrainUpper[i] = SPRITE_TERRAIN_EMPTY;
@@ -121,8 +125,6 @@ void initializeGraphics(){
   }
 }
 
-// Slide the terrain to the left in half-character increments
-//
 void advanceTerrain(char* terrain, byte newTerrain){
   for (int i = 0; i < TERRAIN_WIDTH; ++i) {
     char current = terrain[i];
@@ -143,6 +145,13 @@ void advanceTerrain(char* terrain, byte newTerrain){
     }
   }
 }
+void gl (int czas, int glos){
+
+tone(3, glos);
+delay(czas);
+noTone(3);
+}
+
 
 bool drawHero(byte position, char* terrainUpper, char* terrainLower, unsigned int score) {
   bool collide = false;
@@ -190,6 +199,7 @@ bool drawHero(byte position, char* terrainUpper, char* terrainLower, unsigned in
   if (upper != ' ') {
     terrainUpper[HERO_HORIZONTAL_POSITION] = upper;
     collide = (upperSave == SPRITE_TERRAIN_EMPTY) ? false : true;
+    
   }
   if (lower != ' ') {
     terrainLower[HERO_HORIZONTAL_POSITION] = lower;
@@ -220,57 +230,61 @@ bool drawHero(byte position, char* terrainUpper, char* terrainLower, unsigned in
 // Handle the button push as an interrupt
 void buttonPush() {
   buttonPushed = true;
+  
 }
 
-void setup(){
-  pinMode(PIN_READWRITE, OUTPUT);
-  digitalWrite(PIN_READWRITE, LOW);
-  pinMode(PIN_CONTRAST, OUTPUT);
-  digitalWrite(PIN_CONTRAST, LOW);
-  pinMode(PIN_BUTTON, INPUT);
-  digitalWrite(PIN_BUTTON, HIGH);
-  pinMode(PIN_AUTOPLAY, OUTPUT);
-  digitalWrite(PIN_AUTOPLAY, HIGH);
+void poczatek(){
+  lcd.setCursor(0,0);
+  lcd.print("JUMP OR");
+  lcd.setCursor(2,4);
+  lcd.print("DIE");
   
-  // Digital pin 2 maps to interrupt 0
-  attachInterrupt(0/*PIN_BUTTON*/, buttonPush, FALLING);
+  gl(100,400);
+  gl(100,300);
+  gl(100,200);
+  gl(100,300);
+  gl(100,400);
+  gl(100,600);
+  delay(4000);
+  lcd.clear();
   
-  initializeGraphics();
-  
-  lcd.begin(16, 2);
-}
-
-void loop(){
+}  
+// this next section adds the movement of the hero when it is up
+void gra(int poziomgry){
   static byte heroPos = HERO_POSITION_RUN_LOWER_1;
   static byte newTerrainType = TERRAIN_EMPTY;
   static byte newTerrainDuration = 1;
   static bool playing = false;
   static bool blink = false;
   static unsigned int distance = 0;
-  
   if (!playing) {
     drawHero((blink) ? HERO_POSITION_OFF : heroPos, terrainUpper, terrainLower, distance >> 3);
     if (blink) {
+      lcd.clear();
       lcd.setCursor(0,0);
-      lcd.print("Press Start");
+      lcd.print("Press  JUMP");
     }
     delay(250);
     blink = !blink;
     if (buttonPushed) {
+      gl(100,400);
+      gl(100,600);
+      gl(100,400);
       initializeGraphics();
       heroPos = HERO_POSITION_RUN_LOWER_1;
       playing = true;
       buttonPushed = false;
       distance = 0;
+      
     }
     return;
   }
 
-  // Shift the terrain to the left
+  // shift the terrain to the left
   advanceTerrain(terrainLower, newTerrainType == TERRAIN_LOWER_BLOCK ? SPRITE_TERRAIN_SOLID : SPRITE_TERRAIN_EMPTY);
   advanceTerrain(terrainUpper, newTerrainType == TERRAIN_UPPER_BLOCK ? SPRITE_TERRAIN_SOLID : SPRITE_TERRAIN_EMPTY);
   
-  // Make new terrain to enter on the right
+  // make new terrain to enter on the right
   if (--newTerrainDuration == 0) {
     if (newTerrainType == TERRAIN_EMPTY) {
       newTerrainType = (random(3) == 0) ? TERRAIN_UPPER_BLOCK : TERRAIN_LOWER_BLOCK;
@@ -282,12 +296,21 @@ void loop(){
   }
     
   if (buttonPushed) {
-    if (heroPos <= HERO_POSITION_RUN_LOWER_2) heroPos = HERO_POSITION_JUMP_1;
+    
+    if (heroPos <= HERO_POSITION_RUN_LOWER_2)
+    gl(100,300);
+    heroPos = HERO_POSITION_JUMP_1;
     buttonPushed = false;
+    
   }  
 
   if (drawHero(heroPos, terrainUpper, terrainLower, distance >> 3)) {
-    playing = false; // The hero collided with something. Too bad.
+    playing = false; // the hero collided with something
+    gl(100,500);
+    gl(100,400);
+    gl(120,300);
+    gl(160,400);
+    lcd.clear();
   } else {
     if (heroPos == HERO_POSITION_RUN_LOWER_2 || heroPos == HERO_POSITION_JUMP_8) {
       heroPos = HERO_POSITION_RUN_LOWER_1;
@@ -304,5 +327,73 @@ void loop(){
     
     digitalWrite(PIN_AUTOPLAY, terrainLower[HERO_HORIZONTAL_POSITION + 2] == SPRITE_TERRAIN_EMPTY ? HIGH : LOW);
   }
-  delay(100);
+  delay(poziomgry);
+  }
+// this section enables the setup of the game in the menu  
+void setup(){
+  pinMode(4, INPUT_PULLUP);
+  pinMode(3, OUTPUT);
+  pinMode(PIN_BUTTON, INPUT);
+  digitalWrite(PIN_BUTTON, HIGH);
+  napis = 1;
+
+  attachInterrupt(0/*PIN_BUTTON*/, buttonPush, FALLING);
+  
+  initializeGraphics();
+  
+  lcd.init();
+  lcd.backlight();
+   poczatek();
+   do{menu();}while(digitalRead(2) == HIGH);
+
 }
+
+
+void loop() { 
+
+
+
+
+  
+switch (grasw) {
+case 1:
+gra(70);
+break;
+case 2:
+gra(50);
+break;
+case 3:
+gra(15);
+break;
+case 4:
+gra(1);
+break;
+    }
+  }
+// this section will adjust the difficulty of the game
+void menu() {
+  
+if (napis > 4 || napis < 0) {napis == 0;}
+if (digitalRead(4) == LOW) { napis++;}
+  switch (napis) {
+
+    case 1:
+    lcd.setCursor(0,0);
+  lcd.print("Loading:");
+  lcd.setCursor(0,1);
+  lcd.print("<     Wait...     >");
+  delay(500);
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("Select mode:");
+  lcd.setCursor(0,1);
+  lcd.print("<              >");
+  delay(500);
+  if(digitalRead(2) == LOW) {
+    grasw = 1;
+    grasw;}
+  
+  
+    }
+
+  }
